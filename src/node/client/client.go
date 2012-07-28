@@ -3,24 +3,36 @@ package client
 import (
   "fmt"
   "net/rpc"
-  . "node/registry"
+  . "node/node"
   "node/util"
 )
 
-func Start(name string, seeds []string, port int) {
+func Connect(node *Node, address string) error {
+  client, err := rpc.DialHTTP("tcp", address)
+  if err != nil {
+    return err
+  }
+
+  var reply *int
+  divCall := client.Go("Registry.QueryAll", node.Address, &reply, nil)
+  <-divCall.Done// will be equal to divCall
+
+  util.Publish(node, address)
+  return nil
+}
+
+func Start(name string, hostname string, seeds []string, port int) {
+  var err error
+
+  address := util.Address(hostname, port)
+
+  node := &Node{Name: name, Address: address}
+
   for _, seed := range seeds {
-    address := util.Address(seed, port)
-    client, err := rpc.DialHTTP("tcp", address)
+    err = Connect(node, seed)
     if err != nil {
-      fmt.Println("Error Connecting to Seed", seed, ":", err)
-    } else {
-      fmt.Println("Connected to Seed :", seed)
-      // Asynchronous call
-      var reply *int
-      node := &Node{Name: name}
-      divCall := client.Go("Registry.AddNode", node, &reply, nil)
-      <-divCall.Done// will be equal to divCall
-      // check errors, print, etc.
+      fmt.Println("Error connecting to seed",seed,":",err)
+      err = nil
     }
   }
 }
