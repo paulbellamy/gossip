@@ -3,9 +3,9 @@ package main
 import (
   "flag"
   "strings"
-  "node/server"
-  "node/client"
+  "gossip"
   "os"
+  "os/signal"
 )
 
 
@@ -21,8 +21,10 @@ func main() {
   flag.IntVar(&port, "port", 5000, "Port to listen on")
   flag.Parse()
 
-  if seeds != "" {
-    go client.Start(name, hostname, strings.Split(seeds, ","), port)
-  }
-  server.Start(name, hostname, port)
+  gossip.Start(name, hostname, strings.Split(seeds, ","), port)
+
+  // Wait for Ctrl-C
+  c := make(chan os.Signal, 1)
+  signal.Notify(c, os.Interrupt)
+  <-c
 }
