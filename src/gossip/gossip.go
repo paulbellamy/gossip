@@ -4,6 +4,7 @@ import (
 	"encoding/gob"
 	. "gossip/message"
 	. "gossip/node"
+	. "gossip/node_list"
 	. "gossip/registry"
 	"gossip/util"
 	"log"
@@ -35,7 +36,7 @@ func connect(registry *Registry, address string) error {
 		return err
 	}
 
-	var reply *Registry
+	var reply *NodeList
 	err = client.Call("Registry.Query", "", &reply)
 	if err != nil {
 		return err

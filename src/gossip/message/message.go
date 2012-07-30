@@ -5,8 +5,8 @@ import (
 )
 
 type Message struct {
-	Origin *Node  // originating node
-	Seq    uint64 // sequence number chosen by client
-  ServiceMethod string
-  Args interface{}
+	Origin        *Node  // originating node
+	Seq           uint64 // sequence number chosen by client
+	ServiceMethod string
+	Args          interface{}
 }

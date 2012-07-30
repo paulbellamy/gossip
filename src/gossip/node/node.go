@@ -1,14 +1,14 @@
 package node
 
 import (
-  "fmt"
+	"fmt"
 )
 
 type Node struct {
-  Name string
-  Address string
+	Name    string
+	Address string
 }
 
 func (n *Node) String() string {
-  return fmt.Sprintf("%s", n.Address)
+	return fmt.Sprintf("%s", n.Address)
 }

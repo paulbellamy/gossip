@@ -9,26 +9,26 @@ import (
 )
 
 type Messager struct {
-	Seen  map[string]map[uint64]bool
-	Data  chan []byte
+	Seen map[string]map[uint64]bool
+	Data chan []byte
 }
 
 type Registry struct {
-  *Messager
-  *NodeList
+	*Messager
+	*NodeList
 }
 
 func NewRegistry(name string) *Registry {
 	reg := &Registry{
-    &Messager{
-      Seen: map[string]map[uint64]bool{},
-      Data: make(chan []byte),
-    },
-    &NodeList{
-      Self: nil,
-      Nodes: map[string]*Node{},
-    },
-  }
+		&Messager{
+			Seen: map[string]map[uint64]bool{},
+			Data: make(chan []byte),
+		},
+		&NodeList{
+			Self:  nil,
+			Nodes: map[string]*Node{},
+		},
+	}
 	return reg
 }
 
@@ -38,9 +38,9 @@ func (t *Registry) Query(regex string, reply *NodeList) error {
 	log.Println("Query:", *t)
 
 	*reply = NodeList{
-    Self: t.Self,
-    Nodes: t.Nodes,
-  }
+		Self:  t.Self,
+		Nodes: t.Nodes,
+	}
 	return nil
 }
 
@@ -71,27 +71,32 @@ func (t *Registry) Announce(message *Message, reply *int) error {
 		}
 
 		// Announce the new message to two other nodes
-		var sent = 0
-		var ok int
-		var err error
-		for _, old_node := range t.Nodes {
-			if old_node.Name != message.Origin.Name && old_node.Name != t.Self.Name {
-				ok, err = publish(message, old_node.Address)
-				if err == nil && ok == 1 {
-					log.Println("Announced", message.Seq, "from", message.Origin.Name, "to", old_node.Name)
-					sent++
-				} else if err != nil {
-					log.Println("Error Announcing", message.Seq, "from", message.Origin.Name, "to", old_node.Name, ",", err)
-				}
-
-				if sent >= 2 {
-					break
-				}
-			}
-		}
+		go t.forward(message)
 	}
 
 	return nil
+}
+
+// Announce the new message to two other nodes
+func (t *Registry) forward(message *Message) {
+	var sent = 0
+	var ok int
+	var err error
+	for _, old_node := range t.Nodes {
+		if old_node.Name != message.Origin.Name && old_node.Name != t.Self.Name {
+			ok, err = publish(message, old_node.Address)
+			if err == nil && ok == 1 {
+				log.Println("Announced", message.Seq, "from", message.Origin.Name, "to", old_node.Name)
+				sent++
+			} else if err != nil {
+				log.Println("Error Announcing", message.Seq, "from", message.Origin.Name, "to", old_node.Name, ",", err)
+			}
+
+			if sent >= 2 {
+				break
+			}
+		}
+	}
 }
 
 func publish(message *Message, address string) (int, error) {
@@ -105,14 +110,6 @@ func publish(message *Message, address string) (int, error) {
 	return reply, err
 }
 
-// Merge remote registry into local registry
-func MergeRegistries(local, remote *Registry) {
-	for _, node := range remote.Nodes {
-		AddNode(local, node)
-	}
-	AddNode(local, remote.Self)
-}
-
 func AddNode(reg *Registry, node *Node) {
 	log.Println("AddNode:", node.Name)
 	reg.Nodes[node.Name] = node
@@ -120,4 +117,12 @@ func AddNode(reg *Registry, node *Node) {
 
 func Data(reg *Registry, data []byte) {
 	reg.Data <- data
+}
+
+// Merge remote registry into local registry
+func MergeRegistries(local *Registry, remote *NodeList) {
+	for _, node := range remote.Nodes {
+		AddNode(local, node)
+	}
+	AddNode(local, remote.Self)
 }

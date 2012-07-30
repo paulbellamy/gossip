@@ -1,9 +1,9 @@
 package util
 
 import (
-  "fmt"
+	"fmt"
 )
 
 func Address(hostname string, port int) string {
-  return fmt.Sprintf("%s:%d", hostname, port)
+	return fmt.Sprintf("%s:%d", hostname, port)
 }

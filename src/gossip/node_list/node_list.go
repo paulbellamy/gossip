@@ -1,7 +1,7 @@
 package node_list
 
 import (
-  . "gossip/node"
+	. "gossip/node"
 )
 
 type NodeList struct {
