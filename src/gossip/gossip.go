@@ -1,15 +1,16 @@
 package gossip
 
 import (
-	"encoding/gob"
 	"errors"
+	"fmt"
 	. "gossip/message"
 	. "gossip/node"
 	. "gossip/node_list"
 	. "gossip/registry"
 	"gossip/util"
-	"net/http"
+	"net"
 	"net/rpc"
+	"net/rpc/jsonrpc"
 )
 
 var registry *Registry
@@ -19,21 +20,34 @@ var seq uint64
 func server(registry *Registry, port int) error {
 	rpc.Register(registry)
 	rpc.HandleHTTP()
-	return http.ListenAndServe(util.Address("", port), nil)
+	ln, err := net.Listen("tcp", util.Address("", port))
+	if err != nil {
+		return err
+	}
+	go func() {
+		for {
+			conn, _ := ln.Accept()
+			rpc.ServeCodec(jsonrpc.NewServerCodec(conn))
+		}
+	}()
+	return nil
 }
 
 // Fetch the initial registry from the address
 func connect(registry *Registry, address string) error {
-	client, err := rpc.DialHTTP("tcp", address)
+	conn, err := net.Dial("tcp", address)
 	if err != nil {
 		return err
 	}
+	client := rpc.NewClientWithCodec(jsonrpc.NewClientCodec(conn))
 
 	var reply *NodeList
 	err = client.Call("Registry.Query", "", &reply)
 	if err != nil {
 		return err
 	}
+
+	client.Close()
 
 	MergeRegistries(registry, reply)
 	return nil
@@ -64,7 +78,6 @@ func client(registry *Registry, seeds []string, port int) error {
 		ServiceMethod: "Registry.AddNode",
 		Args:          registry.Self,
 	}
-	gob.Register(registry.Self)
 	return registry.Announce(message, &reply)
 }
 
@@ -73,8 +86,14 @@ func Start(name string, hostname string, seeds []string, port int) (chan []byte,
 	registry = NewRegistry(name)
 	registry.Self = &Node{Name: name, Address: address}
 
-	go server(registry, port)
-	err := client(registry, seeds, port)
+	var err error
+
+	err = server(registry, port)
+	if err != nil {
+		return nil, err
+	}
+
+	err = client(registry, seeds, port)
 	if err != nil {
 		return nil, err
 	}
@@ -89,8 +108,7 @@ func Broadcast(data []byte) {
 		Origin:        registry.Self,
 		Seq:           seq,
 		ServiceMethod: "Registry.Data",
-		Args:          data,
+		Args:          fmt.Sprintf("%s", data),
 	}
-	gob.Register(registry.Self)
 	registry.Announce(message, &reply)
 }

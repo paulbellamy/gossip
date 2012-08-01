@@ -4,7 +4,9 @@ import (
 	. "gossip/message"
 	. "gossip/node"
 	. "gossip/node_list"
+	"net"
 	"net/rpc"
+	"net/rpc/jsonrpc"
 )
 
 type Messager struct {
@@ -59,9 +61,13 @@ func (t *Registry) Announce(message *Message, reply *int) error {
 		// This should be determined by the actual message
 		if message.Origin.Name != t.Self.Name {
 			if message.ServiceMethod == "Registry.AddNode" {
-				AddNode(t, message.Args.(*Node))
+				args := message.Args.(map[string]interface{})
+				AddNode(t, &Node{
+					Name:    args["Name"].(string),
+					Address: args["Address"].(string),
+				})
 			} else if message.ServiceMethod == "Registry.Data" {
-				Data(t, message.Args.([]byte))
+				Data(t, []byte(message.Args.(string)))
 			}
 		}
 
@@ -92,13 +98,20 @@ func (t *Registry) forward(message *Message) {
 }
 
 func publish(message *Message, address string) (int, error) {
-	client, err := rpc.DialHTTP("tcp", address)
+	conn, err := net.Dial("tcp", address)
+	if err != nil {
+		return 0, err
+	}
+
+	client := rpc.NewClientWithCodec(jsonrpc.NewClientCodec(conn))
 	if err != nil {
 		return 0, err
 	}
 
 	var reply int
 	err = client.Call("Registry.Announce", message, &reply)
+
+	client.Close()
 	return reply, err
 }
 
