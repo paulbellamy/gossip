@@ -2,13 +2,12 @@ package gossip
 
 import (
 	"encoding/gob"
+	"errors"
 	. "gossip/message"
 	. "gossip/node"
 	. "gossip/node_list"
 	. "gossip/registry"
 	"gossip/util"
-	"log"
-	"net"
 	"net/http"
 	"net/rpc"
 )
@@ -17,16 +16,10 @@ var registry *Registry
 var seq uint64
 
 // Start up the RPC Server
-func server(registry *Registry, port int) {
+func server(registry *Registry, port int) error {
 	rpc.Register(registry)
 	rpc.HandleHTTP()
-	ln, err := net.Listen("tcp", util.Address("", port))
-	if err != nil {
-		log.Println("Failed to start server on port", port, ":", err)
-	} else {
-		log.Println("Server Listening on port", port)
-	}
-	http.Serve(ln, nil)
+  return http.ListenAndServe(util.Address("", port), nil)
 }
 
 // Fetch the initial registry from the address
@@ -46,17 +39,21 @@ func connect(registry *Registry, address string) error {
 	return nil
 }
 
-func client(registry *Registry, seeds []string, port int) {
-	var err error
-
+func client(registry *Registry, seeds []string, port int) error {
 	// Get the registries from each of the seeds
+  failed := 0
 	for _, seed := range seeds {
-		err = connect(registry, seed)
-		if err != nil {
-			log.Println("Error connecting to seed", seed, ":", err)
-			err = nil
-		}
+    if seed != "" {
+      if connect(registry, seed) != nil {
+        failed++
+      }
+    }
 	}
+
+  // If we couldn't connect to any seeds
+  if failed >= len(seeds) {
+    return errors.New("Unable to connect to any seed nodes")
+  }
 
 	// Announce yourself on the network
 	var reply int
@@ -68,20 +65,21 @@ func client(registry *Registry, seeds []string, port int) {
 		Args:          registry.Self,
 	}
 	gob.Register(registry.Self)
-	registry.Announce(message, &reply)
-
-	log.Println("Registry:", *registry)
+	return registry.Announce(message, &reply)
 }
 
-func Start(name string, hostname string, seeds []string, port int) chan []byte {
+func Start(name string, hostname string, seeds []string, port int) (chan []byte, error) {
 	address := util.Address(hostname, port)
 	registry = NewRegistry(name)
 	registry.Self = &Node{Name: name, Address: address}
 
-	go server(registry, port)
-	go client(registry, seeds, port)
+  go server(registry, port)
+  err := client(registry, seeds, port)
+  if err != nil {
+    return nil, err
+  }
 
-	return registry.Data
+	return registry.Data, nil
 }
 
 func Broadcast(data []byte) {
