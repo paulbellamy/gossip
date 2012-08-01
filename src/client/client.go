@@ -23,12 +23,12 @@ func main() {
 	flag.Parse()
 
 	received, err := gossip.Start(name, hostname, strings.Split(seeds, ","), port)
-  if err != nil {
-    log.Println(err)
-    return
-  } else {
-    log.Println("Client started")
-  }
+	if err != nil {
+		log.Println(err)
+		return
+	} else {
+		log.Println("Client started")
+	}
 
 	// Print any messages received
 	go func() {
@@ -42,6 +42,7 @@ func main() {
 	go func() {
 		for {
 			time.Sleep(5 * time.Second)
+			log.Printf("Announced: %s", name)
 			gossip.Broadcast([]byte(name))
 		}
 	}()
