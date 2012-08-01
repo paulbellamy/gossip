@@ -19,7 +19,7 @@ var seq uint64
 func server(registry *Registry, port int) error {
 	rpc.Register(registry)
 	rpc.HandleHTTP()
-  return http.ListenAndServe(util.Address("", port), nil)
+	return http.ListenAndServe(util.Address("", port), nil)
 }
 
 // Fetch the initial registry from the address
@@ -41,19 +41,19 @@ func connect(registry *Registry, address string) error {
 
 func client(registry *Registry, seeds []string, port int) error {
 	// Get the registries from each of the seeds
-  failed := 0
+	failed := 0
 	for _, seed := range seeds {
-    if seed != "" {
-      if connect(registry, seed) != nil {
-        failed++
-      }
-    }
+		if seed != "" {
+			if connect(registry, seed) != nil {
+				failed++
+			}
+		}
 	}
 
-  // If we couldn't connect to any seeds
-  if failed >= len(seeds) {
-    return errors.New("Unable to connect to any seed nodes")
-  }
+	// If we couldn't connect to any seeds
+	if failed >= len(seeds) {
+		return errors.New("Unable to connect to any seed nodes")
+	}
 
 	// Announce yourself on the network
 	var reply int
@@ -73,11 +73,11 @@ func Start(name string, hostname string, seeds []string, port int) (chan []byte,
 	registry = NewRegistry(name)
 	registry.Self = &Node{Name: name, Address: address}
 
-  go server(registry, port)
-  err := client(registry, seeds, port)
-  if err != nil {
-    return nil, err
-  }
+	go server(registry, port)
+	err := client(registry, seeds, port)
+	if err != nil {
+		return nil, err
+	}
 
 	return registry.Data, nil
 }
